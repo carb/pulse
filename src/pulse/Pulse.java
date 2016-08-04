@@ -11,13 +11,12 @@ import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
+import java.util.Arrays;
 import java.util.Date;
-import java.util.Optional;
-import java.util.Timer;
-import java.util.TimerTask;
 import java.util.concurrent.TimeUnit;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import javafx.animation.KeyFrame;
-import javafx.animation.PauseTransition;
 import javafx.animation.Timeline;
 import javafx.application.Application;
 import javafx.collections.FXCollections;
@@ -26,18 +25,13 @@ import javafx.event.EventHandler;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
-import javafx.scene.control.Alert;
-import javafx.scene.control.Alert.AlertType;
 import javafx.scene.control.Button;
-import javafx.scene.control.ButtonType;
 import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.Separator;
 import javafx.scene.control.TextField;
-import javafx.scene.control.TextInputDialog;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
-import javafx.scene.layout.StackPane;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.scene.text.Text;
@@ -50,9 +44,14 @@ import javafx.util.Duration;
  */
 public class Pulse extends Application {
     
+    private static final String[] MINUTES = new String[] {"00","15","30","45"};
+    
     @Override
     public void start(Stage primaryStage) {
-        DateFormat dateFormat = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
+        DateFormat dateFormat = new SimpleDateFormat("yyyy_MM_dd");
+        DateFormat dateTimeFormat = new SimpleDateFormat("yyyy/MM/dd hh:mma");
+        DateFormat timeFormat = new SimpleDateFormat("hh:mma");
+        DateFormat minuteFormat = new SimpleDateFormat("mm");
         
         GridPane grid = new GridPane();
         grid.setAlignment(Pos.CENTER);
@@ -64,24 +63,26 @@ public class Pulse extends Application {
         scenetitle.setFont(Font.font("Tahoma", FontWeight.NORMAL, 20));
         grid.add(scenetitle, 0, 0, 2, 1);
 
-        Timeline fiveSecondsWonder = new Timeline(new KeyFrame(Duration.minutes(15), new EventHandler<ActionEvent>() {
+        Timeline fiveSecondsWonder = new Timeline(new KeyFrame(Duration.minutes(1), new EventHandler<ActionEvent>() {
             @Override
             public void handle(ActionEvent event) {
-                System.out.println("30sec ping.");
+                Date date = new Date();
+                Date oldDate = new Date(System.currentTimeMillis() - TimeUnit.MINUTES.toMillis(15));;
+                String minuteCount = minuteFormat.format(date);
+                if (!(Arrays.asList(MINUTES).contains(minuteCount))) {
+                    return;
+                }
+ 
                 GridPane grid2 = new GridPane();
                 grid2.setAlignment(Pos.CENTER);
                 grid2.setHgap(10);
                 grid2.setVgap(10);
                 grid2.setPadding(new Insets(25, 25, 25, 25));
-                
-                Date date = new Date();
-                Date oldDate = new Date(System.currentTimeMillis() - TimeUnit.MINUTES.toMillis(15));;
-                System.out.println(dateFormat.format(date)); //2014/08/06 15:59:48
         
                 Text scenetitle2 = new Text(String.format(
                     "Update %s - %s",
-                    dateFormat.format(oldDate),
-                    dateFormat.format(date)
+                    dateTimeFormat.format(oldDate),
+                    timeFormat.format(date)
                 ));
                 scenetitle2.setFont(Font.font("Tahoma", FontWeight.NORMAL, 20));
                 grid2.add(scenetitle2, 0, 0, 2, 1);
@@ -97,13 +98,17 @@ public class Pulse extends Application {
                     FXCollections.observableArrayList(
                         "Coding",
                         "Testing",
+                        "Designing",
                         "Reading Documentation",
                         new Separator(),
                         "Emails",
                         "Meeting",
                         "Blocked",
                         new Separator(),
-                        "Distracted"
+                        "Distracted",
+                        "Breakfast",
+                        "Lunch",
+                        "Dinner"
                     )
                 );
                 grid2.add(cb, 1, 2);
@@ -112,18 +117,21 @@ public class Pulse extends Application {
                 Button btn = new Button("Submit");
                 btn.setOnAction((e) -> {
                     String x = String.format(
-                        "%s\t%s\n",
+                        "%s\t%s\t%s\n",
+                        timeFormat.format(oldDate),
                         userTextField2.getText(),
                         (String)cb.getValue()
                     );
+                    System.out.println("/var/pulse/" + dateFormat.format(oldDate) + "_logs.txt");
                     try {
                         Files.write(
-                            Paths.get("/var/pulse/logs.txt"),
-                            x.getBytes(),
-                            StandardOpenOption.APPEND
+                                Paths.get("/var/pulse/" + dateFormat.format(oldDate) + "_logs.txt"),
+                                x.getBytes(),
+                                StandardOpenOption.CREATE,
+                                StandardOpenOption.APPEND
                         );
-                    } catch (IOException exc) {
-                        //exception handling left as an exercise for the reader
+                    } catch (IOException ex) {
+                        Logger.getLogger(Pulse.class.getName()).log(Level.SEVERE, null, ex);
                     }
                     stage2.close();
                 });
