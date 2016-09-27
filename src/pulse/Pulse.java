@@ -43,96 +43,127 @@ import javafx.util.Duration;
  * @author carlobiedenharn
  */
 public class Pulse extends Application {
-    
-    private static final String[] MINUTES = new String[] {"00","15","30","45"};
-    
-    @Override
-    public void start(Stage primaryStage) {
-        DateFormat dateFormat = new SimpleDateFormat("yyyy_MM_dd");
-        DateFormat dateTimeFormat = new SimpleDateFormat("yyyy/MM/dd hh:mma");
-        DateFormat timeFormat = new SimpleDateFormat("hh:mma");
-        DateFormat minuteFormat = new SimpleDateFormat("mm");
-        
+
+    private static final String[] MINUTES = new String[]{"00", "15", "30", "45"};
+
+    // Basic formatting functions
+    private static final DateFormat DS_FORMAT = new SimpleDateFormat("yyyy_MM_dd");
+    private static final DateFormat DS_TS_FORMAT = new SimpleDateFormat("yyyy/MM/dd hh:mma");
+    private static final DateFormat TS_FORMAT = new SimpleDateFormat("hh:mma");
+    private static final DateFormat MM_FORMAT = new SimpleDateFormat("mm");
+
+    // The start at having some auto completion
+    private String lastMessage = "";
+    private String lastCategory = "No";
+    private int categoryStreak = 0;
+
+    private GridPane buildDefaultGrid() {
         GridPane grid = new GridPane();
         grid.setAlignment(Pos.CENTER);
         grid.setHgap(10);
         grid.setVgap(10);
         grid.setPadding(new Insets(25, 25, 25, 25));
-        
-        Text scenetitle = new Text("Pulse");
-        scenetitle.setFont(Font.font("Tahoma", FontWeight.NORMAL, 20));
-        grid.add(scenetitle, 0, 0, 2, 1);
+
+        return grid;
+    }
+
+    private ChoiceBox buildCategoryList() {
+        ChoiceBox cb = new ChoiceBox(
+                FXCollections.observableArrayList(
+                        "Coding",
+                        "Distracted",
+                        "Emails",
+                        new Separator(),
+                        "Meeting",
+                        "Code Review",
+                        "Reading Docs",
+                        new Separator(),
+                        "Eating"
+                )
+        );
+        return cb;
+    }
+
+    private String buildLogFile(Date date) {
+        return "/var/pulse/" + DS_FORMAT.format(date) + "_logs.txt";
+    }
+
+    private void logPulse(String activity, String category, Date date) {
+        String logLine = String.format("%s\t%s\t%s\n",
+                TS_FORMAT.format(date),
+                activity,
+                category
+        );
+        try {
+            Files.write(Paths.get(buildLogFile(date)),
+                    logLine.getBytes(),
+                    StandardOpenOption.CREATE,
+                    StandardOpenOption.APPEND
+            );
+        } catch (IOException ex) {
+            Logger.getLogger(Pulse.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }
+
+    @Override
+    public void start(Stage primaryStage) {
 
         Timeline fiveSecondsWonder = new Timeline(new KeyFrame(Duration.minutes(1), new EventHandler<ActionEvent>() {
             @Override
             public void handle(ActionEvent event) {
+                // Get the current time and Fifteen Minutes ago.
                 Date date = new Date();
                 Date oldDate = new Date(System.currentTimeMillis() - TimeUnit.MINUTES.toMillis(15));;
-                String minuteCount = minuteFormat.format(date);
+
+                // Only show this popup every fifteen minutes.
+                String minuteCount = MM_FORMAT.format(date);
                 if (!(Arrays.asList(MINUTES).contains(minuteCount))) {
                     return;
                 }
- 
-                GridPane grid2 = new GridPane();
-                grid2.setAlignment(Pos.CENTER);
-                grid2.setHgap(10);
-                grid2.setVgap(10);
-                grid2.setPadding(new Insets(25, 25, 25, 25));
-        
-                Text scenetitle2 = new Text(String.format(
-                    "Update %s - %s",
-                    dateTimeFormat.format(oldDate),
-                    timeFormat.format(date)
+
+                // Build the popup screen config
+                GridPane popupGrid = buildDefaultGrid();
+
+                Text scenetitle2 = new Text(String.format("%s - %s",
+                        TS_FORMAT.format(oldDate),
+                        TS_FORMAT.format(date)
                 ));
                 scenetitle2.setFont(Font.font("Tahoma", FontWeight.NORMAL, 20));
-                grid2.add(scenetitle2, 0, 0, 2, 1);
+                popupGrid.add(scenetitle2, 1, 0, 2, 1);
 
-                Label userName2 = new Label("What you were doing:");
-                grid2.add(userName2, 0, 1);
-                TextField userTextField2 = new TextField();
-                grid2.add(userTextField2, 1, 1);
+                Label oldActionMessage = new Label("Last heartbeat: " + lastMessage);
+                popupGrid.add(oldActionMessage, 0, 1, 2, 1);
 
-                Label twoName2 = new Label("Category:");
-                grid2.add(twoName2, 0, 2);
-                ChoiceBox cb = new ChoiceBox(
-                    FXCollections.observableArrayList(
-                        "Coding",
-                        "Testing",
-                        "Designing",
-                        "Reading Documentation",
-                        new Separator(),
-                        "Emails",
-                        "Meeting",
-                        "Blocked",
-                        new Separator(),
-                        "Distracted",
-                        "Breakfast",
-                        "Lunch",
-                        "Dinner"
-                    )
-                );
-                grid2.add(cb, 1, 2);
-            
+                Label oldActionPrompt = new Label(lastCategory + " streak: " + categoryStreak);
+                popupGrid.add(oldActionPrompt, 0, 2, 2, 1);
+
+                Label promptMessage = new Label("What were you doing:");
+                popupGrid.add(promptMessage, 0, 3);
+
+                TextField previousActivity = new TextField(lastMessage);
+                popupGrid.add(previousActivity, 1, 3);
+
+                Label categoryLabel = new Label("Category:");
+                popupGrid.add(categoryLabel, 0, 4);
+                ChoiceBox cb = buildCategoryList();
+
+                popupGrid.add(cb, 1, 4);
+
                 Stage stage2 = new Stage();
                 Button btn = new Button("Submit");
                 btn.setOnAction((e) -> {
-                    String x = String.format(
-                        "%s\t%s\t%s\n",
-                        timeFormat.format(oldDate),
-                        userTextField2.getText(),
-                        (String)cb.getValue()
-                    );
-                    System.out.println("/var/pulse/" + dateFormat.format(oldDate) + "_logs.txt");
-                    try {
-                        Files.write(
-                                Paths.get("/var/pulse/" + dateFormat.format(oldDate) + "_logs.txt"),
-                                x.getBytes(),
-                                StandardOpenOption.CREATE,
-                                StandardOpenOption.APPEND
-                        );
-                    } catch (IOException ex) {
-                        Logger.getLogger(Pulse.class.getName()).log(Level.SEVERE, null, ex);
+                    String cbString = (String) cb.getValue();
+                    logPulse(previousActivity.getText(), cbString, oldDate);
+
+                    // Store the values for later use
+                    if (lastCategory.equals(cbString)) {
+                        categoryStreak++;
+                    } else {
+                        categoryStreak = 1;
                     }
+                    lastMessage = previousActivity.getText();
+                    lastCategory = cbString;
+
                     stage2.close();
                 });
                 btn.defaultButtonProperty().bind(btn.focusedProperty());
@@ -140,10 +171,10 @@ public class Pulse extends Application {
                 HBox hbBtn = new HBox(10);
                 hbBtn.setAlignment(Pos.BOTTOM_RIGHT);
                 hbBtn.getChildren().add(btn);
-                grid2.add(hbBtn, 1, 4);
+                popupGrid.add(hbBtn, 2, 5);
 
                 stage2.setTitle("Pulse Alert");
-                stage2.setScene(new Scene(grid2, 550, 200));
+                stage2.setScene(new Scene(popupGrid, 550, 200));
                 stage2.show();
                 stage2.setAlwaysOnTop(true);
                 stage2.toFront();
@@ -151,8 +182,14 @@ public class Pulse extends Application {
         }));
         fiveSecondsWonder.setCycleCount(Timeline.INDEFINITE);
         fiveSecondsWonder.play();
-        
-        Scene scene = new Scene(grid, 300, 150);
+
+        // Build the main screen and add the text/title.
+        GridPane pulseScreen = buildDefaultGrid();
+        Text scenetitle = new Text("Pulse");
+        scenetitle.setFont(Font.font("Tahoma", FontWeight.NORMAL, 20));
+        pulseScreen.add(scenetitle, 0, 0, 2, 1);
+
+        Scene scene = new Scene(pulseScreen, 300, 150);
         primaryStage.setTitle("Pulse");
         primaryStage.setScene(scene);
         primaryStage.show();
@@ -164,5 +201,4 @@ public class Pulse extends Application {
     public static void main(String[] args) {
         launch(args);
     }
-    
 }
